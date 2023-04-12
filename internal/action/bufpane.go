@@ -781,6 +781,7 @@ var BufKeyActions = map[string]BufKeyAction{
 	"UnhighlightSearch":         (*BufPane).UnhighlightSearch,
 	"ClearStatus":               (*BufPane).ClearStatus,
 	"ShellMode":                 (*BufPane).ShellMode,
+	"ShellInsert":               (*BufPane).ShellInsert,
 	"CommandMode":               (*BufPane).CommandMode,
 	"ToggleOverwriteMode":       (*BufPane).ToggleOverwriteMode,
 	"Escape":                    (*BufPane).Escape,
