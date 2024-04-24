@@ -290,7 +290,11 @@ func NewBufPaneFromBuf(buf *buffer.Buffer, tab *Tab) *BufPane {
 func (h *BufPane) finishInitialize() {
 	h.initialRelocate()
 	h.initialized = true
-	config.RunPluginFn("onBufPaneOpen", luar.New(ulua.L, h))
+
+	err := config.RunPluginFn("onBufPaneOpen", luar.New(ulua.L, h))
+	if err != nil {
+		screen.TermMessage(err)
+	}
 }
 
 // Resize resizes the pane
@@ -318,7 +322,7 @@ func (h *BufPane) ResizePane(size int) {
 }
 
 // PluginCB calls all plugin callbacks with a certain name and displays an
-// error if there is one and returns the aggregrate boolean response
+// error if there is one and returns the aggregate boolean response
 func (h *BufPane) PluginCB(cb string) bool {
 	b, err := config.RunPluginFnBool(h.Buf.Settings, cb, luar.New(ulua.L, h))
 	if err != nil {
@@ -415,6 +419,12 @@ func (h *BufPane) Name() string {
 	return n
 }
 
+// ReOpen reloads the file opened in the bufpane from disk
+func (h *BufPane) ReOpen() {
+	h.Buf.ReOpen()
+	h.Relocate()
+}
+
 func (h *BufPane) getReloadSetting() string {
 	reloadSetting := h.Buf.Settings["reload"]
 	return reloadSetting.(string)
@@ -433,11 +443,11 @@ func (h *BufPane) HandleEvent(event tcell.Event) {
 				if !yes || canceled {
 					h.Buf.UpdateModTime()
 				} else {
-					h.Buf.ReOpen()
+					h.ReOpen()
 				}
 			})
 		} else if reload == "auto" {
-			h.Buf.ReOpen()
+			h.ReOpen()
 		} else if reload == "disabled" {
 			h.Buf.DisableReload()
 		} else {
@@ -679,6 +689,10 @@ func (h *BufPane) Close() {
 
 // SetActive marks this pane as active.
 func (h *BufPane) SetActive(b bool) {
+	if h.IsActive() == b {
+		return
+	}
+
 	h.BWindow.SetActive(b)
 	if b {
 		// Display any gutter messages for this line
@@ -694,8 +708,12 @@ func (h *BufPane) SetActive(b bool) {
 		if none && InfoBar.HasGutter {
 			InfoBar.ClearGutter()
 		}
-	}
 
+		err := config.RunPluginFn("onSetActive", luar.New(ulua.L, h))
+		if err != nil {
+			screen.TermMessage(err)
+		}
+	}
 }
 
 // BufKeyActions contains the list of all possible key actions the bufhandler could execute
