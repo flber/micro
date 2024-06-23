@@ -169,6 +169,10 @@ func BufMapEvent(k Event, action string) {
 			// if the action changed the current pane, update the reference
 			h = MainTab().CurPane()
 			success = innerSuccess
+			if h == nil {
+				// stop, in case the current pane is not a BufPane
+				break
+			}
 		}
 		return true
 	}
@@ -465,11 +469,7 @@ func (h *BufPane) HandleEvent(event tcell.Event) {
 		h.paste(e.Text())
 		h.Relocate()
 	case *tcell.EventKey:
-		ke := KeyEvent{
-			code: e.Key(),
-			mod:  metaToAlt(e.Modifiers()),
-			r:    e.Rune(),
-		}
+		ke := keyEvent(e)
 
 		done := h.DoKeyEvent(ke)
 		if !done && e.Key() == tcell.KeyRune {
@@ -496,11 +496,16 @@ func (h *BufPane) HandleEvent(event tcell.Event) {
 			// Mouse event with no click - mouse was just released.
 			// If there were multiple mouse buttons pressed, we don't know which one
 			// was actually released, so we assume they all were released.
+			pressed := len(h.mousePressed) > 0
 			for me := range h.mousePressed {
 				delete(h.mousePressed, me)
 
 				me.state = MouseRelease
 				h.DoMouseEvent(me, e)
+			}
+			if !pressed {
+				// Propagate the mouse release in case the press wasn't for this BufPane
+				Tabs.ResetMouse()
 			}
 		}
 	}
@@ -540,7 +545,10 @@ func (h *BufPane) Bindings() *KeyTree {
 }
 
 // DoKeyEvent executes a key event by finding the action it is bound
-// to and executing it (possibly multiple times for multiple cursors)
+// to and executing it (possibly multiple times for multiple cursors).
+// Returns true if the action was executed OR if there are more keys
+// remaining to process before executing an action (if this is a key
+// sequence event). Returns false if no action found.
 func (h *BufPane) DoKeyEvent(e Event) bool {
 	binds := h.Bindings()
 	action, more := binds.NextEvent(e, nil)
@@ -734,10 +742,16 @@ var BufKeyActions = map[string]BufKeyAction{
 	"SelectRight":               (*BufPane).SelectRight,
 	"WordRight":                 (*BufPane).WordRight,
 	"WordLeft":                  (*BufPane).WordLeft,
+	"SubWordRight":              (*BufPane).SubWordRight,
+	"SubWordLeft":               (*BufPane).SubWordLeft,
 	"SelectWordRight":           (*BufPane).SelectWordRight,
 	"SelectWordLeft":            (*BufPane).SelectWordLeft,
+	"SelectSubWordRight":        (*BufPane).SelectSubWordRight,
+	"SelectSubWordLeft":         (*BufPane).SelectSubWordLeft,
 	"DeleteWordRight":           (*BufPane).DeleteWordRight,
 	"DeleteWordLeft":            (*BufPane).DeleteWordLeft,
+	"DeleteSubWordRight":        (*BufPane).DeleteSubWordRight,
+	"DeleteSubWordLeft":         (*BufPane).DeleteSubWordLeft,
 	"SelectLine":                (*BufPane).SelectLine,
 	"SelectToStartOfLine":       (*BufPane).SelectToStartOfLine,
 	"SelectToStartOfText":       (*BufPane).SelectToStartOfText,
@@ -865,10 +879,16 @@ var MultiActions = map[string]bool{
 	"SelectRight":               true,
 	"WordRight":                 true,
 	"WordLeft":                  true,
+	"SubWordRight":              true,
+	"SubWordLeft":               true,
 	"SelectWordRight":           true,
 	"SelectWordLeft":            true,
+	"SelectSubWordRight":        true,
+	"SelectSubWordLeft":         true,
 	"DeleteWordRight":           true,
 	"DeleteWordLeft":            true,
+	"DeleteSubWordRight":        true,
+	"DeleteSubWordLeft":         true,
 	"SelectLine":                true,
 	"SelectToStartOfLine":       true,
 	"SelectToStartOfText":       true,

@@ -81,6 +81,10 @@ func (t *TermPane) SetID(i uint64) {
 	t.id = i
 }
 
+func (t *TermPane) Name() string {
+	return t.Terminal.Name()
+}
+
 func (t *TermPane) SetTab(tab *Tab) {
 	t.tab = tab
 }
@@ -121,11 +125,7 @@ func (t *TermPane) Unsplit() {
 // copy-paste
 func (t *TermPane) HandleEvent(event tcell.Event) {
 	if e, ok := event.(*tcell.EventKey); ok {
-		ke := KeyEvent{
-			code: e.Key(),
-			mod:  metaToAlt(e.Modifiers()),
-			r:    e.Rune(),
-		}
+		ke := keyEvent(e)
 		action, more := TermBindings.NextEvent(ke, nil)
 
 		if !more {

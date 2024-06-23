@@ -107,30 +107,32 @@ func (t *TabList) HandleEvent(event tcell.Event) {
 		mx, my := e.Position()
 		switch e.Buttons() {
 		case tcell.Button1:
-			if my == t.Y && mx == 0 {
-				t.Scroll(-4)
-				return
-			} else if my == t.Y && mx == t.Width-1 {
-				t.Scroll(4)
+			if my == t.Y && len(t.List) > 1 {
+				if mx == 0 {
+					t.Scroll(-4)
+				} else if mx == t.Width-1 {
+					t.Scroll(4)
+				} else {
+					ind := t.LocFromVisual(buffer.Loc{mx, my})
+					if ind != -1 {
+						t.SetActive(ind)
+					}
+				}
 				return
 			}
-			if len(t.List) > 1 {
-				ind := t.LocFromVisual(buffer.Loc{mx, my})
-				if ind != -1 {
-					t.SetActive(ind)
-					return
-				}
-				if my == 0 {
-					return
-				}
+		case tcell.ButtonNone:
+			if t.List[t.Active()].release {
+				// Mouse release received, while already released
+				t.ResetMouse()
+				return
 			}
 		case tcell.WheelUp:
-			if my == t.Y {
+			if my == t.Y && len(t.List) > 1 {
 				t.Scroll(4)
 				return
 			}
 		case tcell.WheelDown:
-			if my == t.Y {
+			if my == t.Y && len(t.List) > 1 {
 				t.Scroll(-4)
 				return
 			}
@@ -166,6 +168,26 @@ func (t *TabList) SetActive(a int) {
 	}
 }
 
+// ResetMouse resets the mouse release state after the screen was stopped
+// or the pane changed.
+// This prevents situations in which mouse releases are received at the wrong place
+// and the mouse state is still pressed.
+func (t *TabList) ResetMouse() {
+	for _, tab := range t.List {
+		if !tab.release && tab.resizing != nil {
+			tab.resizing = nil
+		}
+
+		tab.release = true
+
+		for _, p := range tab.Panes {
+			if bp, ok := p.(*BufPane); ok {
+				bp.resetMouse()
+			}
+		}
+	}
+}
+
 // Tabs is the global tab list
 var Tabs *TabList
 
@@ -184,20 +206,7 @@ func InitTabs(bufs []*buffer.Buffer) {
 		}
 	}
 
-	screen.RestartCallback = func() {
-		// The mouse could be released after the screen was stopped, so that
-		// we couldn't catch the mouse release event and would erroneously think
-		// that it is still pressed. So need to reset the mouse release state
-		// after the screen is restarted.
-		for _, t := range Tabs.List {
-			t.release = true
-			for _, p := range t.Panes {
-				if bp, ok := p.(*BufPane); ok {
-					bp.resetMouse()
-				}
-			}
-		}
-	}
+	screen.RestartCallback = Tabs.ResetMouse
 }
 
 func MainTab() *Tab {
