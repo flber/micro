@@ -2,10 +2,10 @@
 
 set -e
 
-HASH="$(git rev-parse --short HEAD)"
-VERSION="$(go run tools/build-version.go)"
-DATE="$(go run tools/build-date.go)"
-ADDITIONAL_GO_LINKER_FLAGS="$(go run tools/info-plist.go $VERSION)"
+VERSION="$1"
+if [ -z "$VERSION" ]; then
+	VERSION="$(go run tools/build-version.go)"
+fi
 
 mkdir -p binaries
 mkdir -p micro-$VERSION
@@ -20,8 +20,8 @@ cp assets/micro-logo-mark.svg micro-$VERSION/micro.svg
 create_artefact_generic()
 {
 	mv micro micro-$VERSION/
-	tar -czf micro-$VERSION-$1.tgz micro-$VERSION
-	sha256sum micro-$VERSION-$1.tgz > micro-$VERSION-$1.tgz.sha
+	tar -czf micro-$VERSION-$1.tar.gz micro-$VERSION
+	sha256sum micro-$VERSION-$1.tar.gz > micro-$VERSION-$1.tar.gz.sha
 	mv micro-$VERSION-$1.* binaries
 	rm micro-$VERSION/micro
 }

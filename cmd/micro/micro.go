@@ -40,8 +40,7 @@ var (
 	flagClean     = flag.Bool("clean", false, "Clean configuration directory")
 	optionFlags   map[string]*string
 
-	sigterm chan os.Signal
-	sighup  chan os.Signal
+	sighup chan os.Signal
 
 	timerChan chan func()
 )
@@ -274,6 +273,10 @@ func main() {
 				screen.TermMessage(err)
 				continue
 			}
+			if err = config.OptionIsValid(k, nativeValue); err != nil {
+				screen.TermMessage(err)
+				continue
+			}
 			config.GlobalSettings[k] = nativeValue
 			config.VolatileSettings[k] = true
 		}
@@ -353,16 +356,16 @@ func main() {
 		log.Println(clipErr, " or change 'clipboard' option")
 	}
 
+	config.StartAutoSave()
 	if a := config.GetGlobalOption("autosave").(float64); a > 0 {
-		config.SetAutoTime(int(a))
-		config.StartAutoSave()
+		config.SetAutoTime(a)
 	}
 
 	screen.Events = make(chan tcell.Event)
 
-	sigterm = make(chan os.Signal, 1)
+	util.Sigterm = make(chan os.Signal, 1)
 	sighup = make(chan os.Signal, 1)
-	signal.Notify(sigterm, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGABRT)
+	signal.Notify(util.Sigterm, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGABRT)
 	signal.Notify(sighup, syscall.SIGHUP)
 
 	timerChan = make(chan func())
@@ -423,6 +426,7 @@ func DoEvent() {
 			b.AutoSave()
 		}
 	case <-shell.CloseTerms:
+		action.Tabs.CloseTerms()
 	case event = <-screen.Events:
 	case <-screen.DrawChan():
 		for len(screen.DrawChan()) > 0 {
@@ -437,7 +441,7 @@ func DoEvent() {
 			}
 		}
 		os.Exit(0)
-	case <-sigterm:
+	case <-util.Sigterm:
 		for _, b := range buffer.OpenBuffers {
 			if !b.Modified() {
 				b.Fini()
